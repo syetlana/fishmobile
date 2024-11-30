@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'camera.dart';
 import 'thresholding.dart';
+import 'package:image/image.dart' as img;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,7 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   File? _image;
+  img.Image? _binaryImage;
 
   Future<void> _takePicture(BuildContext context) async {
     final result = await Navigator.push(
@@ -49,6 +51,7 @@ class _MyHomePageState extends State<MyHomePage> {
     if (result != null) {
       setState(() {
         _image = File(result);
+        _binaryImage = Thresholding.binarizeImage(_image!); // Получение бинарного изображения
       });
     }
   }
@@ -66,7 +69,7 @@ class _MyHomePageState extends State<MyHomePage> {
             _image == null ? Text('Выберите изображение') : Image.file(_image!),
             SizedBox(height: 20),
             ElevatedButton(
-              onPressed: () => _takePicture(context), // Изменено для открытия TakePictureScreen
+              onPressed: () => _takePicture(context),
               child: Text('Сделать снимок'),
             ),
             ElevatedButton(
@@ -75,11 +78,16 @@ class _MyHomePageState extends State<MyHomePage> {
                 if (pickedFile != null) {
                   setState(() {
                     _image = File(pickedFile.path);
+                    _binaryImage = Thresholding.binarizeImage(_image!); // Получение бинарного изображения
                   });
                 }
               },
               child: Text('Выбрать из галереи'),
             ),
+            SizedBox(height: 20),
+            // Отображение бинарного изображения
+            if (_binaryImage != null)
+              Image.memory(img.encodeJpg(_binaryImage!)), // Отображаем бинарное изображение
           ],
         ),
       ),
