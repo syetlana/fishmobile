@@ -1,34 +1,45 @@
 import 'dart:io';
-import 'package:flutter/material.dart';
 import 'package:image/image.dart' as img;
 
 class Thresholding {
-  static img.Image binarizeImage(File imageFile) {
-    // Загружаем изображение
-    final image = img.decodeImage(imageFile.readAsBytesSync())!;
+  /// Метод для адаптивной бинаризации изображения
+  static img.Image binarizeImage(File imageFile, {int blockSize = 15, int offset = 10}) {
+    // Загружаем изображение из файла
+    final originalImage = img.decodeImage(imageFile.readAsBytesSync());
 
-    // Параметры для пороговой обработки
-    int threshold = 128; // Уровень порога, можно настраивать
+    if (originalImage == null) {
+      throw Exception("Не удалось загрузить изображение.");
+    }
 
-    // Создаем новое бинарное изображение
-    final binaryImage = img.Image(width: image.width, height: image.height);
+    // Преобразуем изображение в оттенки серого
+    final grayscaleImage = img.grayscale(originalImage);
+    final binaryImage = img.Image(width: grayscaleImage.width, height: grayscaleImage.height);
 
-    // Проходим по всем пикселям изображения
-    for (int y = 0; y < image.height; y++) {
-      for (int x = 0; x < image.width; x++) {
-        // Получаем цвет пикселя
-        img.Pixel pixel = image.getPixel(x, y);
-        // Получаем значение яркости
-        num brightness = img.getLuminance(pixel);
+    for (int y = 0; y < grayscaleImage.height; y++) {
+      for (int x = 0; x < grayscaleImage.width; x++) {
+        // Вычисление границ блока
+        int xStart = (x - blockSize ~/ 2).clamp(0, grayscaleImage.width - 1);
+        int yStart = (y - blockSize ~/ 2).clamp(0, grayscaleImage.height - 1);
+        int xEnd = (x + blockSize ~/ 2).clamp(0, grayscaleImage.width - 1);
+        int yEnd = (y + blockSize ~/ 2).clamp(0, grayscaleImage.height - 1);
 
-        // Устанавливаем цвет в бинарное изображение
-        if (brightness < threshold) {
-          // Если яркость ниже порога, устанавливаем черный пиксель
-          binaryImage.setPixel(x, y, img.convertColor(img.ColorRgb8(0, 0, 0)));
-        } else {
-          // Если яркость выше порога, устанавливаем белый пиксель
-          binaryImage.setPixel(x, y, img.convertColor(img.ColorRgb8(255, 255, 255)));
+        // Вычисляем среднее значение яркости в блоке
+        int sum = 0;
+        int count = 0;
+        for (int blockY = yStart; blockY <= yEnd; blockY++) {
+          for (int blockX = xStart; blockX <= xEnd; blockX++) {
+            final pixel = grayscaleImage.getPixel(blockX, blockY);
+            sum += img.getLuminance(pixel).toInt();
+            count++;
+          }
         }
+        final meanBrightness = sum ~/ count;
+
+        // Бинаризация пикселя на основе локального среднего
+        final pixel = grayscaleImage.getPixel(x, y);
+        final brightness = img.getLuminance(pixel);
+        final color = brightness < (meanBrightness - offset) ? img.convertColor(img.ColorRgb8(0, 0, 0)) : img.convertColor(img.ColorRgb8(255, 255, 255));
+        binaryImage.setPixel(x, y, color);
       }
     }
 
